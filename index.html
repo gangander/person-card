@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="記事卡">
+<meta name="theme-color" content="#171923">
+<title>檔案 · 一個人的記事卡</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Noto+Serif+TC:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#171923;
+    --paper:#F6F0E4;
+    --paper-2:#ECE1CB;
+    --ink:#241F1B;
+    --ink-soft:#6B6255;
+    --accent:#9C4A3C;      /* sienna — headings, name */
+    --accent-2:#3F5D54;    /* muted sage — links / contact */
+    --gold:#B8935A;
+    --line:#D9CBAE;
+    --danger:#9C4A3C;
+    --radius:18px;
+  }
+  html[data-theme="indigo"]{
+    --bg:#12101C; --paper:#EDE9F7; --paper-2:#E1DAF0;
+    --ink:#241E38; --ink-soft:#6B6285;
+    --accent:#5D4B8C; --accent-2:#3E5C82; --gold:#9C86D9; --line:#D6CBEF;
+  }
+  html[data-theme="blush"]{
+    --bg:#1F1620; --paper:#FBEDEF; --paper-2:#F5DEE1;
+    --ink:#3A2027; --ink-soft:#8C6B71;
+    --accent:#B4485E; --accent-2:#8C6E4B; --gold:#D68FA0; --line:#EFC9D0;
+  }
+  html[data-theme="forest"]{
+    --bg:#101914; --paper:#EFEEE1; --paper-2:#E3E0CB;
+    --ink:#1F2A22; --ink-soft:#5E6E5F;
+    --accent:#3F6B4A; --accent-2:#7A5C3E; --gold:#8CAA6E; --line:#CFD6BC;
+  }
+  body, .card, .btn{
+    transition: background-color .25s ease, color .25s ease, border-color .25s ease;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse at 20% -10%, #23283a 0%, transparent 55%),
+      radial-gradient(ellipse at 100% 110%, #1c2030 0%, transparent 50%),
+      var(--bg);
+    font-family:'Noto Sans TC','IBM Plex Mono',sans-serif;
+    color:var(--ink);
+    padding:32px 16px 80px;
+    display:flex;
+    justify-content:center;
+  }
+  .wrap{width:100%;max-width:480px;}
+
+  /* ---- top bar ---- */
+  .topbar{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:14px;padding:0 4px;
+    flex-wrap:wrap;gap:8px 0;
+  }
+  .topbar .btn{padding:8px 11px;font-size:12.5px;}
+  .topbar .brand{
+    color:#B9B2C7;font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .btn{
+    font-family:'Noto Sans TC',sans-serif;
+    font-size:13px;font-weight:600;
+    border:1px solid rgba(255,255,255,.18);
+    background:rgba(255,255,255,.06);
+    color:#EDE7F5;
+    padding:8px 14px;border-radius:999px;
+    cursor:pointer;
+    transition:background .15s ease, transform .1s ease;
+  }
+  .btn:hover{background:rgba(255,255,255,.12);}
+  .btn:active{transform:scale(.97);}
+  .btn.primary{
+    background:var(--accent);border-color:var(--accent);color:#fff;
+  }
+  .btn.primary:hover{background:#8a3f33;}
+  .btn.ghost-danger{
+    border-color:rgba(220,120,100,.35); color:#E7A79A;
+  }
+
+  /* ---- card / index-card record ---- */
+  .card{
+    position:relative;
+    background:var(--paper);
+    border-radius:var(--radius);
+    padding:34px 26px 26px;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.55), 0 2px 0 rgba(255,255,255,.5) inset;
+    background-image:
+      radial-gradient(circle, rgba(0,0,0,.05) 1px, transparent 1.4px);
+    background-size:14px 14px;
+  }
+  .tab{
+    position:absolute;
+    top:-16px;left:26px;
+    background:var(--accent-2);
+    color:#F3F1E6;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;letter-spacing:.08em;
+    padding:6px 14px 5px;
+    border-radius:8px 8px 0 0;
+  }
+  .punch{
+    position:absolute; top:14px; right:22px;
+    display:flex; gap:8px;
+  }
+  .punch span{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--bg);
+    box-shadow:0 1px 1px rgba(0,0,0,.25) inset;
+  }
+
+  .name-row{margin-bottom:4px;padding-right:60px;}
+  .name{
+    font-family:'Noto Serif TC',serif;
+    font-weight:700;font-size:30px;color:var(--ink);
+    line-height:1.15;
+    display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  }
+  .name input{
+    font:inherit;color:inherit;background:transparent;border:none;
+    border-bottom:1px dashed var(--line);width:100%;padding:2px 0;
+  }
+  .subtitle{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;color:var(--accent);
+    letter-spacing:.06em;
+    margin-top:2px;
+  }
+  .subtitle input{
+    font:inherit;color:inherit;background:transparent;border:none;
+    border-bottom:1px dashed var(--line);
+  }
+  .zodiac-line{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;color:var(--ink-soft);
+    margin-top:10px;
+  }
+
+  .divider{
+    border:none;border-top:1px dashed var(--line);
+    margin:20px 0 14px;
+  }
+
+  .section-title{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--gold);
+    margin:22px 0 8px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .section-title::after{
+    content:'';flex:1;border-top:1px solid var(--line);
+  }
+
+  .row{
+    display:flex;gap:14px;padding:9px 0;
+    border-bottom:1px dotted var(--line);
+    align-items:flex-start;
+  }
+  .row:last-child{border-bottom:none;}
+  .row .label{
+    flex:0 0 78px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;color:var(--ink-soft);
+    padding-top:2px;
+  }
+  .row .value{
+    flex:1;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13.5px;color:var(--ink);
+    text-align:right;
+    white-space:pre-line;
+    word-break:break-word;
+  }
+  .row .value a{color:var(--accent-2);text-decoration:none;border-bottom:1px solid currentColor;}
+  .row.empty .value{color:#B9AF9C;font-style:italic;}
+
+  .row input, .row textarea{
+    width:100%;
+    font-family:'IBM Plex Mono',monospace;font-size:13.5px;color:var(--ink);
+    text-align:right;
+    background:var(--paper-2);
+    border:1px solid var(--line);border-radius:6px;
+    padding:6px 8px;resize:vertical;
+  }
+  .row textarea{min-height:44px;line-height:1.5;}
+  .row .del-field{
+    flex:0 0 auto;align-self:center;
+    background:none;border:none;color:#B9887E;font-size:16px;cursor:pointer;
+    padding:2px 4px;
+  }
+
+  .hint{
+    font-family:'Noto Sans TC',sans-serif;
+    font-size:11px;color:var(--ink-soft);opacity:.75;
+    margin-top:4px;
+  }
+
+  .link-row{padding:9px 0;border-bottom:1px dotted var(--line);}
+  .link-row:last-child{border-bottom:none;}
+  .link-line{display:flex;justify-content:space-between;gap:10px;align-items:center;}
+  .link-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);}
+  .link-value a{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--accent-2);word-break:break-all;text-align:right;text-decoration:none;border-bottom:1px solid currentColor;}
+  .link-edit{display:flex;gap:6px;margin-top:6px;}
+  .link-edit input{flex:1;font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:var(--paper-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;}
+  .link-edit input.label-input{flex:0 0 80px;}
+
+  .add-row{
+    display:flex;justify-content:center;margin-top:10px;
+  }
+  .add-row button{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;color:var(--accent-2);
+    background:none;border:1px dashed var(--line);
+    border-radius:8px;padding:8px 16px;cursor:pointer;width:100%;
+  }
+  .add-row button:hover{background:rgba(63,93,84,.06);}
+
+  .footer-stamp{
+    text-align:center;margin-top:26px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;color:#B9AF9C;letter-spacing:.08em;
+  }
+
+  .action-bar{
+    display:flex;gap:10px;margin-top:18px;
+  }
+  .action-bar .btn{flex:1;text-align:center;}
+
+  .theme-row{
+    display:flex;gap:10px;justify-content:center;
+    margin-bottom:16px;
+  }
+  .swatch{
+    width:30px;height:30px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.15);
+    cursor:pointer;padding:0;
+    position:relative;
+    box-shadow:0 2px 6px rgba(0,0,0,.35);
+  }
+  .swatch.active{border-color:#fff;box-shadow:0 0 0 2px var(--gold, #B8935A);}
+  .swatch[data-theme="classic"]{background:linear-gradient(135deg,#F6F0E4 50%,#9C4A3C 50%);}
+  .swatch[data-theme="indigo"]{background:linear-gradient(135deg,#EDE9F7 50%,#5D4B8C 50%);}
+  .swatch[data-theme="blush"]{background:linear-gradient(135deg,#FBEDEF 50%,#B4485E 50%);}
+  .swatch[data-theme="forest"]{background:linear-gradient(135deg,#EFEEE1 50%,#3F6B4A 50%);}
+
+  @media (max-width:400px){
+    .row .label{flex-basis:64px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">個人記事檔案</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" id="exportBtn" title="下載備份檔">匯出</button>
+      <button class="btn" id="importBtn" title="從備份檔還原">匯入</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+      <button class="btn" id="editToggle">編輯</button>
+    </div>
+  </div>
+
+  <div class="theme-row" id="themeRow"></div>
+
+  <div class="card" id="card">
+    <div class="tab" id="tabLabel">寶貝</div>
+    <div class="punch"><span></span><span></span></div>
+
+    <div class="name-row">
+      <div class="name" id="nameDisplay"></div>
+    </div>
+    <div class="subtitle" id="subtitleDisplay"></div>
+    <div class="zodiac-line" id="zodiacLine"></div>
+
+    <hr class="divider">
+
+    <div class="section-title">基本資料</div>
+    <div id="basicFields"></div>
+
+    <div class="section-title">聯絡與社群</div>
+    <div id="linkFields"></div>
+    <div class="add-row" id="addLinkRow" style="display:none;">
+      <button id="addLinkBtn">+ 新增連結</button>
+    </div>
+
+    <div class="section-title">生活細節</div>
+    <div id="lifeFields"></div>
+
+    <div class="section-title">關於我們</div>
+    <div id="usFields"></div>
+
+    <div class="section-title">其他記錄</div>
+    <div id="customFields"></div>
+    <div class="add-row" id="addCustomRow" style="display:none;">
+      <button id="addCustomBtn">+ 新增自訂欄位</button>
+    </div>
+
+    <div class="footer-stamp" id="stamp">尚未建立記錄</div>
+  </div>
+
+  <div class="action-bar" id="editActionBar" style="display:none;">
+    <button class="btn primary" id="saveBtn">儲存</button>
+    <button class="btn ghost-danger" id="resetBtn">清空重來</button>
+  </div>
+
+</div>
+
+<script>
+const STORAGE_KEY = 'person-card-profile';
+
+const BASIC_DEFS = [
+  {key:'nickname', label:'暱稱'},
+  {key:'birthday', label:'生日', type:'date'},
+  {key:'gender', label:'性別'},
+  {key:'height', label:'身高'},
+  {key:'mbti', label:'MBTI'},
+  {key:'job', label:'職業'},
+  {key:'company', label:'公司'},
+  {key:'address', label:'住址'},
+];
+
+const LIFE_DEFS = [
+  {key:'pet', label:'寵物'},
+  {key:'medication', label:'用藥'},
+  {key:'spicy', label:'辣度'},
+  {key:'music', label:'音樂'},
+  {key:'dislikes', label:'不吃 / 不喜歡', type:'list'},
+  {key:'likes', label:'喜歡的食物', type:'list'},
+  {key:'interests', label:'興趣', type:'list'},
+];
+
+const US_DEFS = [
+  {key:'relationship', label:'關係'},
+  {key:'metHow', label:'怎麼認識'},
+  {key:'anniversary', label:'紀念日', type:'date'},
+];
+
+function defaultProfile(){
+  return {
+    name:'', tag:'寶貝', subtitle:'',
+    theme:'classic',
+    basic:{}, life:{}, us:{},
+    links:[], custom:[],
+    updatedAt:null
+  };
+}
+
+let profile = defaultProfile();
+let editing = false;
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      profile = Object.assign(defaultProfile(), JSON.parse(raw));
+    }
+  }catch(e){
+    profile = defaultProfile();
+  }
+  editing = false;
+  render();
+}
+
+function save(){
+  profile.updatedAt = new Date().toISOString();
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+  }catch(e){
+    console.error('儲存失敗', e);
+    alert('這台裝置的瀏覽器儲存空間可能已滿，或處於無痕模式導致無法儲存。');
+    return;
+  }
+  editing = false;
+  render();
+}
+
+async function exportBackup(){
+  const jsonStr = JSON.stringify(profile, null, 2);
+  const stamp = new Date().toISOString().slice(0,10);
+  const filename = `記事卡備份_${(profile.name||'未命名')}_${stamp}.json`;
+
+  // iOS / iPhone: prefer native Share Sheet (Save to Files, AirDrop, Messages...)
+  try{
+    const file = new File([jsonStr], filename, {type:'application/json'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:'記事卡備份'});
+      return;
+    }
+  }catch(e){
+    if(e && e.name === 'AbortError') return; // user cancelled share sheet, do nothing
+    // otherwise fall through to download fallback
+  }
+
+  // Fallback: normal browser download (desktop / older iOS in a full Safari tab)
+  const blob = new Blob([jsonStr], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const parsed = JSON.parse(reader.result);
+      profile = Object.assign(defaultProfile(), parsed);
+      save();
+      alert('已還原備份');
+    }catch(e){
+      alert('這個檔案看起來不是有效的備份檔');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function renderThemeRow(){
+  const themes = [
+    {id:'classic', label:'原色'},
+    {id:'indigo', label:'靛夜'},
+    {id:'blush', label:'柔粉'},
+    {id:'forest', label:'森綠'},
+  ];
+  const el = document.getElementById('themeRow');
+  el.innerHTML = themes.map(t => `<button class="swatch ${profile.theme===t.id?'active':''}" data-theme="${t.id}" title="${t.label}"></button>`).join('');
+  el.querySelectorAll('.swatch').forEach(btn => {
+    btn.onclick = () => {
+      profile.theme = btn.dataset.theme;
+      save();
+    };
+  });
+}
+
+function zodiacWestern(m,d){
+  const table = [
+    [1,20,'摩羯座'],[2,19,'水瓶座'],[3,21,'雙魚座'],[4,20,'牡羊座'],
+    [5,21,'金牛座'],[6,21,'雙子座'],[7,23,'巨蟹座'],[8,23,'獅子座'],
+    [9,23,'處女座'],[10,23,'天秤座'],[11,22,'天蠍座'],[12,22,'射手座']
+  ];
+  const idx = m-1;
+  const [, cutoff, sign] = table[idx];
+  if(d < cutoff){
+    const prev = table[(idx+11)%12];
+    return prev[2];
+  }
+  return sign;
+}
+function chineseZodiac(y){
+  const animals = ['鼠','牛','虎','兔','龍','蛇','馬','羊','猴','雞','狗','豬'];
+  return animals[(y - 4) % 12];
+}
+
+function fmtDate(str){
+  if(!str) return '';
+  const d = new Date(str+'T00:00:00');
+  if(isNaN(d)) return str;
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function esc(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function autolink(url){
+  const safe = /^https?:\/\//i.test(url);
+  if(!safe) return esc(url);
+  return `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a>`;
+}
+
+function render(){
+  document.documentElement.dataset.theme = profile.theme || 'classic';
+  renderThemeRow();
+
+  document.getElementById('editToggle').textContent = editing ? '取消' : '編輯';
+  document.getElementById('editActionBar').style.display = editing ? 'flex' : 'none';
+  document.getElementById('addLinkRow').style.display = editing ? 'flex' : 'none';
+  document.getElementById('addCustomRow').style.display = editing ? 'flex' : 'none';
+
+  renderHeader();
+  renderGroup('basicFields', BASIC_DEFS, profile.basic);
+  renderLinks();
+  renderGroup('lifeFields', LIFE_DEFS, profile.life);
+  renderGroup('usFields', US_DEFS, profile.us);
+  renderCustom();
+
+  const stamp = document.getElementById('stamp');
+  stamp.textContent = profile.updatedAt
+    ? `最後更新 · ${new Date(profile.updatedAt).toLocaleString('zh-TW',{hour12:false})}`
+    : '尚未建立記錄';
+
+  bindEvents();
+}
+
+function renderHeader(){
+  const nameEl = document.getElementById('nameDisplay');
+  const subEl = document.getElementById('subtitleDisplay');
+  const tabEl = document.getElementById('tabLabel');
+  const zEl = document.getElementById('zodiacLine');
+
+  tabEl.textContent = profile.tag || '記事卡';
+
+  if(editing){
+    nameEl.innerHTML = `<input id="nameInput" placeholder="姓名" value="${esc(profile.name)}">`;
+    subEl.innerHTML = `<input id="tagInput" placeholder="標籤，例如：寶貝／家人" value="${esc(profile.tag)}" style="margin-right:8px;width:48%;">
+                        <input id="subInput" placeholder="一句話備註" value="${esc(profile.subtitle)}" style="width:48%;">`;
+  }else{
+    nameEl.textContent = profile.name || '（尚未命名）';
+    subEl.textContent = profile.subtitle || '';
+  }
+
+  const bday = profile.basic.birthday;
+  if(bday && !editing){
+    const d = new Date(bday+'T00:00:00');
+    if(!isNaN(d)){
+      const sign = zodiacWestern(d.getMonth()+1, d.getDate());
+      const animal = chineseZodiac(d.getFullYear());
+      zEl.textContent = `${fmtDate(bday)} ・ ${sign} ・ 屬${animal}`;
+      zEl.style.display='block';
+    }else{ zEl.style.display='none'; }
+  }else{
+    zEl.style.display='none';
+  }
+}
+
+function renderGroup(containerId, defs, data){
+  const el = document.getElementById(containerId);
+  el.innerHTML = defs.map(def => {
+    const raw = data[def.key] || '';
+    if(editing){
+      if(def.type === 'list'){
+        return `<div class="row">
+          <div class="label">${def.label}</div>
+          <textarea data-group="${containerId}" data-key="${def.key}" data-type="list" placeholder="每行一項">${esc((Array.isArray(raw)?raw.join('\n'):raw))}</textarea>
+        </div>`;
+      }
+      const inputType = def.type === 'date' ? 'date' : 'text';
+      return `<div class="row">
+        <div class="label">${def.label}</div>
+        <input type="${inputType}" data-group="${containerId}" data-key="${def.key}" value="${esc(Array.isArray(raw)?raw.join(', '):raw)}">
+      </div>`;
+    }else{
+      let display = Array.isArray(raw) ? raw.filter(Boolean).join('\n') : raw;
+      if(def.type === 'date' && display) display = fmtDate(display);
+      const isEmpty = !display;
+      return `<div class="row ${isEmpty?'empty':''}">
+        <div class="label">${def.label}</div>
+        <div class="value">${isEmpty ? '未填寫' : esc(display)}</div>
+      </div>`;
+    }
+  }).join('');
+}
+
+function renderLinks(){
+  const el = document.getElementById('linkFields');
+  if(profile.links.length === 0 && !editing){
+    el.innerHTML = `<div class="row empty"><div class="label">連結</div><div class="value">未填寫</div></div>`;
+    return;
+  }
+  el.innerHTML = profile.links.map((lk, i) => {
+    if(editing){
+      return `<div class="link-row">
+        <div class="link-edit">
+          <input class="label-input" data-link-idx="${i}" data-link-field="label" value="${esc(lk.label)}" placeholder="名稱">
+          <input data-link-idx="${i}" data-link-field="url" value="${esc(lk.url)}" placeholder="https://...">
+          <button class="del-field" data-del-link="${i}">✕</button>
+        </div>
+      </div>`;
+    }else{
+      return `<div class="link-row link-line">
+        <div class="link-label">${esc(lk.label||'連結')}</div>
+        <div class="link-value">${autolink(lk.url)}</div>
+      </div>`;
+    }
+  }).join('');
+}
+
+function renderCustom(){
+  const el = document.getElementById('customFields');
+  if(profile.custom.length === 0 && !editing){
+    el.innerHTML = `<div class="row empty"><div class="label">備註</div><div class="value">未填寫</div></div>`;
+    return;
+  }
+  el.innerHTML = profile.custom.map((f, i) => {
+    if(editing){
+      return `<div class="row">
+        <input style="flex:0 0 78px;font-size:12px;padding:6px 8px;" data-custom-idx="${i}" data-custom-field="label" value="${esc(f.label)}" placeholder="欄位名稱">
+        <textarea data-custom-idx="${i}" data-custom-field="value" placeholder="內容（多行請分行）">${esc(f.value)}</textarea>
+        <button class="del-field" data-del-custom="${i}">✕</button>
+      </div>`;
+    }else{
+      return `<div class="row"><div class="label">${esc(f.label||'欄位')}</div><div class="value">${esc(f.value)||'—'}</div></div>`;
+    }
+  }).join('');
+}
+
+function collectFromDOM(){
+  document.querySelectorAll('[data-group]').forEach(inp => {
+    const group = inp.dataset.group === 'basicFields' ? 'basic'
+                : inp.dataset.group === 'lifeFields' ? 'life' : 'us';
+    const key = inp.dataset.key;
+    if(inp.dataset.type === 'list'){
+      profile[group][key] = inp.value.split('\n').map(s=>s.trim()).filter(Boolean);
+    }else{
+      profile[group][key] = inp.value.trim();
+    }
+  });
+  const nameInput = document.getElementById('nameInput');
+  const tagInput = document.getElementById('tagInput');
+  const subInput = document.getElementById('subInput');
+  if(nameInput) profile.name = nameInput.value.trim();
+  if(tagInput) profile.tag = tagInput.value.trim();
+  if(subInput) profile.subtitle = subInput.value.trim();
+
+  document.querySelectorAll('[data-link-idx]').forEach(inp => {
+    const i = +inp.dataset.linkIdx;
+    const field = inp.dataset.linkField;
+    if(profile.links[i]) profile.links[i][field] = inp.value.trim();
+  });
+  document.querySelectorAll('[data-custom-idx]').forEach(inp => {
+    const i = +inp.dataset.customIdx;
+    const field = inp.dataset.customField;
+    if(profile.custom[i]) profile.custom[i][field] = inp.value.trim();
+  });
+}
+
+function bindEvents(){
+  document.getElementById('exportBtn').onclick = () => {
+    if(editing) collectFromDOM();
+    exportBackup();
+  };
+  document.getElementById('importBtn').onclick = () => {
+    document.getElementById('importFile').click();
+  };
+  document.getElementById('importFile').onchange = (e) => {
+    const file = e.target.files[0];
+    if(file){
+      if(confirm('匯入備份將覆蓋目前的資料，確定要繼續嗎？')){
+        importBackup(file);
+      }
+    }
+    e.target.value = '';
+  };
+  document.getElementById('editToggle').onclick = () => {
+    if(editing){ load(); return; }
+    editing = true; render();
+  };
+  const saveBtn = document.getElementById('saveBtn');
+  if(saveBtn) saveBtn.onclick = () => { collectFromDOM(); save(); };
+  const resetBtn = document.getElementById('resetBtn');
+  if(resetBtn) resetBtn.onclick = () => {
+    if(confirm('確定要清空所有記錄嗎？此動作無法復原。')){
+      profile = defaultProfile();
+      save();
+    }
+  };
+  const addLinkBtn = document.getElementById('addLinkBtn');
+  if(addLinkBtn) addLinkBtn.onclick = () => {
+    collectFromDOM();
+    profile.links.push({label:'', url:''});
+    render();
+  };
+  const addCustomBtn = document.getElementById('addCustomBtn');
+  if(addCustomBtn) addCustomBtn.onclick = () => {
+    collectFromDOM();
+    profile.custom.push({label:'', value:''});
+    render();
+  };
+  document.querySelectorAll('[data-del-link]').forEach(btn => {
+    btn.onclick = () => {
+      collectFromDOM();
+      profile.links.splice(+btn.dataset.delLink, 1);
+      render();
+    };
+  });
+  document.querySelectorAll('[data-del-custom]').forEach(btn => {
+    btn.onclick = () => {
+      collectFromDOM();
+      profile.custom.splice(+btn.dataset.delCustom, 1);
+      render();
+    };
+  });
+}
+
+load();
+</script>
+</body>
+</html>
