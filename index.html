@@ -60,14 +60,24 @@
 
   /* ---- top bar ---- */
   .topbar{
-    display:flex;justify-content:space-between;align-items:center;
     margin-bottom:14px;padding:0 4px;
-    flex-wrap:wrap;gap:8px 0;
   }
-  .topbar .btn{padding:8px 11px;font-size:12.5px;}
+  .topbar-main{
+    display:flex;justify-content:space-between;align-items:center;
+    gap:12px;
+  }
   .topbar .brand{
     color:#B9B2C7;font-size:12px;letter-spacing:.14em;text-transform:uppercase;
     font-family:'IBM Plex Mono',monospace;
+  }
+  .topbar-main .btn{
+    min-height:40px;padding:0 20px;font-size:14px;flex:0 0 auto;
+  }
+  .topbar-sub{
+    display:flex;gap:8px;margin-top:10px;
+  }
+  .topbar-sub .btn{
+    flex:1;min-height:38px;padding:0 10px;
   }
   .btn{
     font-family:'Noto Sans TC',sans-serif;
@@ -78,6 +88,7 @@
     padding:8px 14px;border-radius:999px;
     cursor:pointer;
     transition:background .15s ease, transform .1s ease;
+    display:inline-flex;align-items:center;justify-content:center;
   }
   .btn:hover{background:rgba(255,255,255,.12);}
   .btn:active{transform:scale(.97);}
@@ -85,6 +96,10 @@
     background:var(--accent);border-color:var(--accent);color:#fff;
   }
   .btn.primary:hover{background:#8a3f33;}
+  .btn.subtle{
+    background:rgba(255,255,255,.03);
+    color:#B9B2C7;font-size:12.5px;font-weight:500;
+  }
   .btn.ghost-danger{
     border-color:rgba(220,120,100,.35); color:#E7A79A;
   }
@@ -193,11 +208,6 @@
   .subtitle input{
     font:inherit;color:inherit;background:transparent;border:none;
     border-bottom:1px dashed var(--line);
-  }
-  .zodiac-line{
-    font-family:'IBM Plex Mono',monospace;
-    font-size:11.5px;color:var(--ink-soft);
-    margin-top:10px;
   }
 
   .divider{
@@ -317,12 +327,14 @@
 <div class="wrap">
 
   <div class="topbar">
-    <div class="brand">個人記事檔案</div>
-    <div style="display:flex;gap:8px;">
-      <button class="btn" id="exportBtn" title="下載備份檔">匯出</button>
-      <button class="btn" id="importBtn" title="從備份檔還原">匯入</button>
+    <div class="topbar-main">
+      <div class="brand">個人記事檔案</div>
+      <button class="btn primary" id="editToggle">編輯</button>
+    </div>
+    <div class="topbar-sub">
+      <button class="btn subtle" id="exportBtn">匯出備份</button>
+      <button class="btn subtle" id="importBtn">匯入備份</button>
       <input type="file" id="importFile" accept="application/json" style="display:none;">
-      <button class="btn" id="editToggle">編輯</button>
     </div>
   </div>
 
@@ -345,7 +357,6 @@
       </div>
     </div>
     <input type="file" id="portraitFile" accept="image/*" style="display:none;">
-    <div class="zodiac-line" id="zodiacLine"></div>
 
     <hr class="divider">
 
@@ -673,7 +684,6 @@ function renderHeader(){
   const nameEl = document.getElementById('nameDisplay');
   const subEl = document.getElementById('subtitleDisplay');
   const tabEl = document.getElementById('tabLabel');
-  const zEl = document.getElementById('zodiacLine');
 
   tabEl.textContent = profile.tag || '記事卡';
 
@@ -684,19 +694,6 @@ function renderHeader(){
   }else{
     nameEl.textContent = profile.name || '（尚未命名）';
     subEl.textContent = profile.subtitle || '';
-  }
-
-  const bday = profile.basic.birthday;
-  if(bday && !editing){
-    const d = new Date(bday+'T00:00:00');
-    if(!isNaN(d)){
-      const sign = zodiacWestern(d.getMonth()+1, d.getDate());
-      const animal = chineseZodiac(d.getFullYear());
-      zEl.textContent = `${fmtDate(bday)} ・ ${sign} ・ 屬${animal}`;
-      zEl.style.display='block';
-    }else{ zEl.style.display='none'; }
-  }else{
-    zEl.style.display='none';
   }
 }
 
@@ -719,6 +716,14 @@ function renderGroup(containerId, defs, data){
     }else{
       let display = Array.isArray(raw) ? raw.filter(Boolean).join('\n') : raw;
       if(def.type === 'date' && display) display = fmtDate(display);
+      if(def.key === 'birthday' && raw){
+        const d = new Date(raw+'T00:00:00');
+        if(!isNaN(d)){
+          const sign = zodiacWestern(d.getMonth()+1, d.getDate());
+          const animal = chineseZodiac(d.getFullYear());
+          display = `${display} ・ ${sign} ・ 屬${animal}`;
+        }
+      }
       const isEmpty = !display;
       return `<div class="row ${isEmpty?'empty':''}">
         <div class="label">${def.label}</div>
