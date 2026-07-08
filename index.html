@@ -192,6 +192,50 @@
     font-family:'IBM Plex Mono',monospace;font-size:12px;color:#B9AF9C;
     font-style:italic;padding:6px 0;
   }
+
+  .icon-btn{
+    min-height:40px;min-width:40px;padding:0;font-size:17px;
+    background:rgba(255,255,255,.06);
+  }
+
+  .lock-overlay, .lock-settings-overlay{
+    position:fixed;inset:0;z-index:999;
+    background:rgba(10,9,15,.88);
+    backdrop-filter:blur(6px);
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+  }
+  .lock-card, .lock-settings-card{
+    width:100%;max-width:380px;
+    background:var(--paper);
+    border-radius:var(--radius);
+    padding:32px 26px;
+    text-align:center;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.6);
+  }
+  .lock-settings-card{text-align:left;}
+  .lock-icon{font-size:36px;margin-bottom:6px;}
+  .lock-title{
+    font-family:'Noto Serif TC',serif;font-weight:700;font-size:20px;
+    color:var(--ink);margin-bottom:4px;
+  }
+  .lock-sub{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);
+    margin-bottom:20px;
+  }
+  .lock-bio-btn{width:100%;margin-bottom:16px;min-height:46px;}
+  .lock-pin-row{display:flex;gap:8px;}
+  .lock-pin-input{
+    flex:1;font-family:'IBM Plex Mono',monospace;font-size:16px;letter-spacing:.2em;
+    text-align:center;background:var(--paper-2);border:1px solid var(--line);
+    border-radius:8px;padding:10px 8px;color:var(--ink);
+  }
+  .lock-pin-row .btn{flex:0 0 auto;min-height:44px;}
+  .lock-error{
+    margin-top:12px;font-size:12px;color:var(--danger);min-height:16px;
+    font-family:'Noto Sans TC',sans-serif;
+  }
+
   .name{
     font-family:'Noto Serif TC',serif;
     font-weight:700;font-size:30px;color:var(--ink);
@@ -327,12 +371,41 @@
 </style>
 </head>
 <body>
+
+<div class="lock-overlay" id="lockOverlay" style="display:none;">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">已鎖定</div>
+    <div class="lock-sub">請驗證身份以繼續</div>
+    <button class="btn primary lock-bio-btn" id="lockBioBtn" style="display:none;">使用 Face ID／Touch ID 解鎖</button>
+    <div class="lock-pin-row">
+      <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="lockPinInput" placeholder="輸入密碼" class="lock-pin-input">
+      <button class="btn primary" id="lockPinSubmit">解鎖</button>
+    </div>
+    <div class="lock-error" id="lockError"></div>
+  </div>
+</div>
+
+<div class="lock-settings-overlay" id="lockSettingsOverlay" style="display:none;">
+  <div class="lock-settings-card">
+    <div class="section-title" style="margin-top:0;">鎖定設定</div>
+    <div id="lockSettingsBody"></div>
+    <div class="action-bar">
+      <button class="btn primary" id="lockSettingsSave">儲存</button>
+      <button class="btn" id="lockSettingsClose">關閉</button>
+    </div>
+  </div>
+</div>
+
 <div class="wrap">
 
   <div class="topbar">
     <div class="topbar-main">
       <div class="brand">個人記事檔案</div>
-      <button class="btn primary" id="editToggle">編輯</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn icon-btn" id="lockSettingsBtn" title="鎖定設定">🔒</button>
+        <button class="btn primary" id="editToggle">編輯</button>
+      </div>
     </div>
     <div class="topbar-sub">
       <button class="btn subtle" id="exportBtn">匯出備份</button>
@@ -400,6 +473,11 @@
 
 <script>
 const STORAGE_KEY = 'person-card-profile';
+const LOCK_KEY = 'person-card-lock';
+
+let lockSettings = { enabled:false, salt:null, pinHash:null, useBiometric:false, credId:null };
+let sessionUnlocked = false;
+let hiddenAt = null;
 
 const BASIC_DEFS = [
   {key:'nickname', label:'暱稱'},
@@ -893,7 +971,224 @@ function bindEvents(){
   });
 }
 
-load();
+/* ===================== 鎖定功能 ===================== */
+
+function loadLockSettings(){
+  try{
+    const raw = localStorage.getItem(LOCK_KEY);
+    if(raw) lockSettings = Object.assign(lockSettings, JSON.parse(raw));
+  }catch(e){ /* ignore, use defaults */ }
+}
+function saveLockSettings(){
+  try{
+    localStorage.setItem(LOCK_KEY, JSON.stringify(lockSettings));
+  }catch(e){
+    alert('鎖定設定儲存失敗');
+  }
+}
+
+async function sha256Hex(str){
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function randomHex(len){
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function setPin(pin){
+  lockSettings.salt = randomHex(16);
+  lockSettings.pinHash = await sha256Hex(lockSettings.salt + pin);
+}
+async function verifyPin(pin){
+  if(!lockSettings.pinHash) return false;
+  return (await sha256Hex(lockSettings.salt + pin)) === lockSettings.pinHash;
+}
+
+function bufToBase64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function base64ToBuf(b64){
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+async function biometricAvailable(){
+  try{
+    return !!(window.PublicKeyCredential &&
+      await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+  }catch(e){ return false; }
+}
+
+async function registerBiometric(){
+  const cred = await navigator.credentials.create({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: { name: '個人記事卡' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'person-card', displayName: '個人記事卡' },
+      pubKeyCredParams: [{alg:-7, type:'public-key'}, {alg:-257, type:'public-key'}],
+      authenticatorSelection: { authenticatorAttachment:'platform', userVerification:'required' },
+      timeout: 60000,
+    }
+  });
+  lockSettings.credId = bufToBase64(cred.rawId);
+}
+
+async function verifyBiometric(){
+  if(!lockSettings.credId) throw new Error('未設定生物辨識');
+  await navigator.credentials.get({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{ id: base64ToBuf(lockSettings.credId), type:'public-key' }],
+      userVerification: 'required',
+      timeout: 60000,
+    }
+  });
+  return true; // resolved without throwing = verification succeeded
+}
+
+function showLockOverlay(){
+  document.getElementById('lockOverlay').style.display = 'flex';
+  document.getElementById('lockError').textContent = '';
+  document.getElementById('lockPinInput').value = '';
+  document.getElementById('lockBioBtn').style.display =
+    (lockSettings.useBiometric && lockSettings.credId) ? 'block' : 'none';
+}
+function hideLockOverlay(){
+  document.getElementById('lockOverlay').style.display = 'none';
+}
+function unlockSuccess(){
+  sessionUnlocked = true;
+  hideLockOverlay();
+  load();
+}
+async function tryBiometricUnlock(){
+  try{
+    await verifyBiometric();
+    unlockSuccess();
+  }catch(e){
+    document.getElementById('lockError').textContent = 'Face ID／Touch ID 驗證失敗，請輸入密碼';
+  }
+}
+async function tryPinUnlock(){
+  const pin = document.getElementById('lockPinInput').value;
+  if(await verifyPin(pin)){
+    unlockSuccess();
+  }else{
+    document.getElementById('lockError').textContent = '密碼錯誤，請再試一次';
+  }
+}
+
+async function renderLockSettingsBody(){
+  const bioAvail = await biometricAvailable();
+  const el = document.getElementById('lockSettingsBody');
+  el.innerHTML = `
+    <div class="row">
+      <div class="label">開啟鎖定</div>
+      <div class="value"><input type="checkbox" id="lockEnableChk" ${lockSettings.enabled?'checked':''}></div>
+    </div>
+    <div id="lockPinFields" style="${lockSettings.enabled?'':'display:none;'}">
+      <div class="row"><div class="label">設定密碼</div>
+        <input type="password" inputmode="numeric" id="newPin1" placeholder="4-8 位數字" class="lock-pin-input" style="width:100%;text-align:right;">
+      </div>
+      <div class="row"><div class="label">再輸入一次</div>
+        <input type="password" inputmode="numeric" id="newPin2" placeholder="再輸入一次" class="lock-pin-input" style="width:100%;text-align:right;">
+      </div>
+      ${bioAvail ? `<div class="row"><div class="label">Face ID／Touch ID</div>
+        <div class="value"><input type="checkbox" id="lockBioChk" ${lockSettings.useBiometric?'checked':''}></div></div>` : ''}
+    </div>
+    <div class="hint">${lockSettings.pinHash ? '已設定過密碼，若下面留白就沿用原本的密碼' : '密碼是 Face ID／Touch ID 無法使用時的備用解鎖方式，一定要設定'}</div>
+  `;
+  const enableChk = document.getElementById('lockEnableChk');
+  enableChk.onchange = (e) => {
+    document.getElementById('lockPinFields').style.display = e.target.checked ? 'block' : 'none';
+  };
+}
+
+function openLockSettings(){
+  renderLockSettingsBody();
+  document.getElementById('lockSettingsOverlay').style.display = 'flex';
+}
+function closeLockSettings(){
+  document.getElementById('lockSettingsOverlay').style.display = 'none';
+}
+
+function setupLockUI(){
+  document.getElementById('lockSettingsBtn').onclick = openLockSettings;
+  document.getElementById('lockSettingsClose').onclick = closeLockSettings;
+  document.getElementById('lockBioBtn').onclick = tryBiometricUnlock;
+  document.getElementById('lockPinSubmit').onclick = tryPinUnlock;
+  document.getElementById('lockPinInput').onkeydown = (e) => {
+    if(e.key === 'Enter') tryPinUnlock();
+  };
+
+  document.getElementById('lockSettingsSave').onclick = async () => {
+    const enable = document.getElementById('lockEnableChk').checked;
+    if(!enable){
+      lockSettings = { enabled:false, salt:null, pinHash:null, useBiometric:false, credId:null };
+      saveLockSettings();
+      closeLockSettings();
+      return;
+    }
+    const p1 = document.getElementById('newPin1').value;
+    const p2 = document.getElementById('newPin2').value;
+    if(p1 || p2){
+      if(p1.length < 4){ alert('密碼至少要 4 位數'); return; }
+      if(p1 !== p2){ alert('兩次輸入的密碼不一致'); return; }
+      await setPin(p1);
+    }
+    if(!lockSettings.pinHash){ alert('請先設定一組密碼'); return; }
+
+    const bioChk = document.getElementById('lockBioChk');
+    const wantBio = bioChk ? bioChk.checked : false;
+    if(wantBio && !lockSettings.credId){
+      try{
+        await registerBiometric();
+      }catch(e){
+        alert('Face ID／Touch ID 設定失敗，先只用密碼鎖，可以之後再來開啟');
+        lockSettings.useBiometric = false;
+        lockSettings.enabled = true;
+        saveLockSettings();
+        closeLockSettings();
+        return;
+      }
+    }
+    lockSettings.useBiometric = wantBio;
+    lockSettings.enabled = true;
+    saveLockSettings();
+    closeLockSettings();
+    alert('鎖定已啟用，下次打開就會需要驗證');
+  };
+
+  // re-lock after the app has been backgrounded for a while (grace period so
+  // the iOS photo picker used for portrait/gallery uploads doesn't trigger a re-lock)
+  document.addEventListener('visibilitychange', () => {
+    if(document.hidden){
+      hiddenAt = Date.now();
+    }else if(lockSettings.enabled && sessionUnlocked && hiddenAt){
+      const away = Date.now() - hiddenAt;
+      if(away > 15000){
+        sessionUnlocked = false;
+        showLockOverlay();
+      }
+      hiddenAt = null;
+    }
+  });
+}
+
+/* ===================== 啟動流程 ===================== */
+
+setupLockUI();
+loadLockSettings();
+if(lockSettings.enabled){
+  showLockOverlay();
+  if(lockSettings.useBiometric && lockSettings.credId){
+    tryBiometricUnlock();
+  }
+}else{
+  load();
+}
 </script>
 </body>
 </html>
