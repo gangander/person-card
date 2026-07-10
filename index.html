@@ -644,6 +644,16 @@ function renderThemeRow(){
   });
 }
 
+function calcAge(birthDate){
+  const now = new Date();
+  let age = now.getFullYear() - birthDate.getFullYear();
+  const hadBirthdayThisYear =
+    (now.getMonth() > birthDate.getMonth()) ||
+    (now.getMonth() === birthDate.getMonth() && now.getDate() >= birthDate.getDate());
+  if(!hadBirthdayThisYear) age--;
+  return age;
+}
+
 function zodiacWestern(m,d){
   const md = m*100 + d;
   if(md >= 120 && md <= 218) return '水瓶座';
@@ -801,9 +811,10 @@ function renderGroup(containerId, defs, data){
       if(def.key === 'birthday' && raw){
         const d = new Date(raw+'T00:00:00');
         if(!isNaN(d)){
+          const age = calcAge(d);
           const sign = zodiacWestern(d.getMonth()+1, d.getDate());
           const animal = chineseZodiac(d.getFullYear());
-          display = `${display} ・ ${sign} ・ 屬${animal}`;
+          display = `${display} ・ ${age}歲 ・ ${sign} ・ 屬${animal}`;
         }
       }
       const isEmpty = !display;
