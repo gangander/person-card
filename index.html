@@ -310,6 +310,19 @@
     background:none;border:none;color:#B9887E;font-size:16px;cursor:pointer;
     padding:2px 4px;
   }
+  .row .field-label-input{
+    flex:0 0 84px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink);
+    background:var(--paper-2);border:1px solid var(--line);border-radius:6px;
+    padding:6px 8px;text-align:left;width:auto;
+  }
+  .row .field-value-input{
+    flex:1;
+    font-family:'IBM Plex Mono',monospace;font-size:13.5px;color:var(--ink);
+    background:var(--paper-2);border:1px solid var(--line);border-radius:6px;
+    padding:6px 8px;text-align:right;resize:vertical;width:auto;
+  }
+  .row textarea.field-value-input{min-height:44px;line-height:1.5;text-align:left;}
 
   .hint{
     font-family:'Noto Sans TC',sans-serif;
@@ -438,6 +451,9 @@
 
     <div class="section-title">基本資料</div>
     <div id="basicFields"></div>
+    <div class="add-row" id="addBasicRow" style="display:none;">
+      <button id="addBasicBtn">+ 新增欄位</button>
+    </div>
 
     <div class="section-title">聯絡與社群</div>
     <div id="linkFields"></div>
@@ -447,9 +463,15 @@
 
     <div class="section-title">生活細節</div>
     <div id="lifeFields"></div>
+    <div class="add-row" id="addLifeRow" style="display:none;">
+      <button id="addLifeBtn">+ 新增欄位</button>
+    </div>
 
     <div class="section-title">關於我們</div>
     <div id="usFields"></div>
+    <div class="add-row" id="addUsRow" style="display:none;">
+      <button id="addUsBtn">+ 新增欄位</button>
+    </div>
 
     <div class="section-title">其他記錄</div>
     <div id="customFields"></div>
@@ -495,9 +517,9 @@ const LIFE_DEFS = [
   {key:'medication', label:'用藥'},
   {key:'spicy', label:'辣度'},
   {key:'music', label:'音樂'},
-  {key:'dislikes', label:'不吃 / 不喜歡', type:'list'},
-  {key:'likes', label:'喜歡的食物', type:'list'},
-  {key:'interests', label:'興趣', type:'list'},
+  {key:'dislikes', label:'不吃 / 不喜歡'},
+  {key:'likes', label:'喜歡的食物'},
+  {key:'interests', label:'興趣'},
 ];
 
 const US_DEFS = [
@@ -510,10 +532,48 @@ function defaultProfile(){
   return {
     name:'', tag:'寶貝', subtitle:'',
     theme:'classic', photo:'', gallery:[],
-    basic:{}, life:{}, us:{},
-    links:[], custom:[],
+    sections:{
+      basic: BASIC_DEFS.map(d => ({id:d.key, label:d.label, type:d.type||'text', value:''})),
+      life: LIFE_DEFS.map(d => ({id:d.key, label:d.label, type:d.type||'text', value:''})),
+      us: US_DEFS.map(d => ({id:d.key, label:d.label, type:d.type||'text', value:''})),
+      custom: []
+    },
+    links:[],
     updatedAt:null
   };
+}
+
+function makeFieldId(){
+  return 'f_' + Math.random().toString(36).slice(2, 9);
+}
+
+// Converts data saved by older versions of this app (flat basic/life/us/custom
+// objects) into the new flexible sections format, without losing any values.
+function migrateProfile(p){
+  if(p.sections) return p; // already on the new schema
+
+  function buildFrom(defs, groupKey){
+    const groupData = p[groupKey] || {};
+    return defs.map(d => {
+      let val = groupData[d.key];
+      if(val === undefined || val === null) val = '';
+      if(Array.isArray(val)) val = val.filter(Boolean).join('\n');
+      return { id:d.key, label:d.label, type:d.type||'text', value:val };
+    });
+  }
+
+  const sections = {
+    basic: buildFrom(BASIC_DEFS, 'basic'),
+    life: buildFrom(LIFE_DEFS, 'life'),
+    us: buildFrom(US_DEFS, 'us'),
+    custom: (p.custom || []).map(f => ({
+      id: makeFieldId(), label: f.label || '', type:'text', value: f.value || ''
+    }))
+  };
+
+  const migrated = Object.assign({}, p, { sections });
+  delete migrated.basic; delete migrated.life; delete migrated.us; delete migrated.custom;
+  return migrated;
 }
 
 let profile = defaultProfile();
@@ -523,7 +583,8 @@ function load(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
-      profile = Object.assign(defaultProfile(), JSON.parse(raw));
+      const parsed = migrateProfile(JSON.parse(raw));
+      profile = Object.assign(defaultProfile(), parsed);
     }
   }catch(e){
     profile = defaultProfile();
@@ -698,16 +759,19 @@ function render(){
   document.getElementById('editToggle').textContent = editing ? '取消' : '編輯';
   document.getElementById('editActionBar').style.display = editing ? 'flex' : 'none';
   document.getElementById('addLinkRow').style.display = editing ? 'flex' : 'none';
+  document.getElementById('addBasicRow').style.display = editing ? 'flex' : 'none';
+  document.getElementById('addLifeRow').style.display = editing ? 'flex' : 'none';
+  document.getElementById('addUsRow').style.display = editing ? 'flex' : 'none';
   document.getElementById('addCustomRow').style.display = editing ? 'flex' : 'none';
 
   renderHeader();
   renderPortrait();
   renderGallery();
-  renderGroup('basicFields', BASIC_DEFS, profile.basic);
+  renderSection('basicFields', 'basic');
   renderLinks();
-  renderGroup('lifeFields', LIFE_DEFS, profile.life);
-  renderGroup('usFields', US_DEFS, profile.us);
-  renderCustom();
+  renderSection('lifeFields', 'life');
+  renderSection('usFields', 'us');
+  renderSection('customFields', 'custom');
 
   const stamp = document.getElementById('stamp');
   stamp.textContent = profile.updatedAt
@@ -789,27 +853,30 @@ function renderHeader(){
   }
 }
 
-function renderGroup(containerId, defs, data){
+function renderSection(containerId, sectionKey){
   const el = document.getElementById(containerId);
-  el.innerHTML = defs.map(def => {
-    const raw = data[def.key] || '';
+  const arr = profile.sections[sectionKey];
+
+  if(arr.length === 0 && !editing){
+    el.innerHTML = `<div class="row empty"><div class="label">—</div><div class="value">尚無欄位</div></div>`;
+    return;
+  }
+
+  el.innerHTML = arr.map((f, i) => {
     if(editing){
-      if(def.type === 'list'){
-        return `<div class="row">
-          <div class="label">${def.label}</div>
-          <textarea data-group="${containerId}" data-key="${def.key}" data-type="list" placeholder="每行一項">${esc((Array.isArray(raw)?raw.join('\n'):raw))}</textarea>
-        </div>`;
-      }
-      const inputType = def.type === 'date' ? 'date' : 'text';
+      const valueEl = f.type === 'date'
+        ? `<input type="date" class="field-value-input" data-sec="${sectionKey}" data-idx="${i}" data-part="value" value="${esc(f.value)}">`
+        : `<textarea class="field-value-input" data-sec="${sectionKey}" data-idx="${i}" data-part="value" placeholder="內容（多行可分行）">${esc(f.value)}</textarea>`;
       return `<div class="row">
-        <div class="label">${def.label}</div>
-        <input type="${inputType}" data-group="${containerId}" data-key="${def.key}" value="${esc(Array.isArray(raw)?raw.join(', '):raw)}">
+        <input class="field-label-input" data-sec="${sectionKey}" data-idx="${i}" data-part="label" value="${esc(f.label)}" placeholder="欄位名稱">
+        ${valueEl}
+        <button class="del-field" data-del-section="${sectionKey}" data-del-index="${i}" title="刪除欄位">✕</button>
       </div>`;
     }else{
-      let display = Array.isArray(raw) ? raw.filter(Boolean).join('\n') : raw;
-      if(def.type === 'date' && display) display = fmtDate(display);
-      if(def.key === 'birthday' && raw){
-        const d = new Date(raw+'T00:00:00');
+      let display = f.value || '';
+      if(f.type === 'date' && display) display = fmtDate(display);
+      if(sectionKey === 'basic' && f.id === 'birthday' && f.value){
+        const d = new Date(f.value+'T00:00:00');
         if(!isNaN(d)){
           const age = calcAge(d);
           const sign = zodiacWestern(d.getMonth()+1, d.getDate());
@@ -819,7 +886,7 @@ function renderGroup(containerId, defs, data){
       }
       const isEmpty = !display;
       return `<div class="row ${isEmpty?'empty':''}">
-        <div class="label">${def.label}</div>
+        <div class="label">${esc(f.label) || '欄位'}</div>
         <div class="value">${isEmpty ? '未填寫' : esc(display)}</div>
       </div>`;
     }
@@ -850,36 +917,24 @@ function renderLinks(){
   }).join('');
 }
 
-function renderCustom(){
-  const el = document.getElementById('customFields');
-  if(profile.custom.length === 0 && !editing){
-    el.innerHTML = `<div class="row empty"><div class="label">備註</div><div class="value">未填寫</div></div>`;
-    return;
-  }
-  el.innerHTML = profile.custom.map((f, i) => {
-    if(editing){
-      return `<div class="row">
-        <input style="flex:0 0 78px;font-size:12px;padding:6px 8px;" data-custom-idx="${i}" data-custom-field="label" value="${esc(f.label)}" placeholder="欄位名稱">
-        <textarea data-custom-idx="${i}" data-custom-field="value" placeholder="內容（多行請分行）">${esc(f.value)}</textarea>
-        <button class="del-field" data-del-custom="${i}">✕</button>
-      </div>`;
-    }else{
-      return `<div class="row"><div class="label">${esc(f.label||'欄位')}</div><div class="value">${esc(f.value)||'—'}</div></div>`;
-    }
-  }).join('');
-}
-
 function collectFromDOM(){
-  document.querySelectorAll('[data-group]').forEach(inp => {
-    const group = inp.dataset.group === 'basicFields' ? 'basic'
-                : inp.dataset.group === 'lifeFields' ? 'life' : 'us';
-    const key = inp.dataset.key;
-    if(inp.dataset.type === 'list'){
-      profile[group][key] = inp.value.split('\n').map(s=>s.trim()).filter(Boolean);
-    }else{
-      profile[group][key] = inp.value.trim();
+  document.querySelectorAll('[data-sec]').forEach(inp => {
+    const sec = inp.dataset.sec;
+    const idx = +inp.dataset.idx;
+    const part = inp.dataset.part;
+    const field = profile.sections[sec] && profile.sections[sec][idx];
+    if(!field) return;
+    if(part === 'label'){
+      field.label = inp.value.trim();
+    }else if(part === 'value'){
+      if(field.type === 'date'){
+        field.value = inp.value;
+      }else{
+        field.value = inp.value.split('\n').map(s => s.trim()).filter(Boolean).join('\n');
+      }
     }
   });
+
   const nameInput = document.getElementById('nameInput');
   const tagInput = document.getElementById('tagInput');
   const subInput = document.getElementById('subInput');
@@ -892,11 +947,12 @@ function collectFromDOM(){
     const field = inp.dataset.linkField;
     if(profile.links[i]) profile.links[i][field] = inp.value.trim();
   });
-  document.querySelectorAll('[data-custom-idx]').forEach(inp => {
-    const i = +inp.dataset.customIdx;
-    const field = inp.dataset.customField;
-    if(profile.custom[i]) profile.custom[i][field] = inp.value.trim();
-  });
+}
+
+function addField(sectionKey){
+  collectFromDOM();
+  profile.sections[sectionKey].push({ id: makeFieldId(), label:'', type:'text', value:'' });
+  render();
 }
 
 function bindEvents(){
@@ -961,12 +1017,15 @@ function bindEvents(){
     profile.links.push({label:'', url:''});
     render();
   };
+  const addBasicBtn = document.getElementById('addBasicBtn');
+  if(addBasicBtn) addBasicBtn.onclick = () => addField('basic');
+  const addLifeBtn = document.getElementById('addLifeBtn');
+  if(addLifeBtn) addLifeBtn.onclick = () => addField('life');
+  const addUsBtn = document.getElementById('addUsBtn');
+  if(addUsBtn) addUsBtn.onclick = () => addField('us');
   const addCustomBtn = document.getElementById('addCustomBtn');
-  if(addCustomBtn) addCustomBtn.onclick = () => {
-    collectFromDOM();
-    profile.custom.push({label:'', value:''});
-    render();
-  };
+  if(addCustomBtn) addCustomBtn.onclick = () => addField('custom');
+
   document.querySelectorAll('[data-del-link]').forEach(btn => {
     btn.onclick = () => {
       collectFromDOM();
@@ -974,10 +1033,10 @@ function bindEvents(){
       render();
     };
   });
-  document.querySelectorAll('[data-del-custom]').forEach(btn => {
+  document.querySelectorAll('[data-del-section]').forEach(btn => {
     btn.onclick = () => {
       collectFromDOM();
-      profile.custom.splice(+btn.dataset.delCustom, 1);
+      profile.sections[btn.dataset.delSection].splice(+btn.dataset.delIndex, 1);
       render();
     };
   });
