@@ -323,6 +323,17 @@
     padding:6px 8px;text-align:right;resize:vertical;width:auto;
   }
   .row textarea.field-value-input{min-height:44px;line-height:1.5;text-align:left;}
+  .move-btns{
+    flex:0 0 auto;display:flex;flex-direction:column;gap:3px;
+    align-self:center;
+  }
+  .move-btn{
+    width:22px;height:20px;padding:0;
+    font-size:9px;line-height:20px;text-align:center;
+    background:rgba(0,0,0,.05);border:1px solid var(--line);border-radius:4px;
+    color:var(--ink-soft);cursor:pointer;
+  }
+  .move-btn:disabled{opacity:.25;cursor:default;}
 
   .hint{
     font-family:'Noto Sans TC',sans-serif;
@@ -867,7 +878,12 @@ function renderSection(containerId, sectionKey){
       const valueEl = f.type === 'date'
         ? `<input type="date" class="field-value-input" data-sec="${sectionKey}" data-idx="${i}" data-part="value" value="${esc(f.value)}">`
         : `<textarea class="field-value-input" data-sec="${sectionKey}" data-idx="${i}" data-part="value" placeholder="內容（多行可分行）">${esc(f.value)}</textarea>`;
+      const moveBtns = `<div class="move-btns">
+        <button class="move-btn" data-move-sec="${sectionKey}" data-move-idx="${i}" data-move-dir="-1" ${i===0?'disabled':''} title="上移">▲</button>
+        <button class="move-btn" data-move-sec="${sectionKey}" data-move-idx="${i}" data-move-dir="1" ${i===arr.length-1?'disabled':''} title="下移">▼</button>
+      </div>`;
       return `<div class="row">
+        ${moveBtns}
         <input class="field-label-input" data-sec="${sectionKey}" data-idx="${i}" data-part="label" value="${esc(f.label)}" placeholder="欄位名稱">
         ${valueEl}
         <button class="del-field" data-del-section="${sectionKey}" data-del-index="${i}" title="刪除欄位">✕</button>
@@ -901,8 +917,13 @@ function renderLinks(){
   }
   el.innerHTML = profile.links.map((lk, i) => {
     if(editing){
+      const moveBtns = `<div class="move-btns">
+        <button class="move-btn" data-move-link-idx="${i}" data-move-link-dir="-1" ${i===0?'disabled':''} title="上移">▲</button>
+        <button class="move-btn" data-move-link-idx="${i}" data-move-link-dir="1" ${i===profile.links.length-1?'disabled':''} title="下移">▼</button>
+      </div>`;
       return `<div class="link-row">
         <div class="link-edit">
+          ${moveBtns}
           <input class="label-input" data-link-idx="${i}" data-link-field="label" value="${esc(lk.label)}" placeholder="名稱">
           <input data-link-idx="${i}" data-link-field="url" value="${esc(lk.url)}" placeholder="https://...">
           <button class="del-field" data-del-link="${i}">✕</button>
@@ -1037,6 +1058,27 @@ function bindEvents(){
     btn.onclick = () => {
       collectFromDOM();
       profile.sections[btn.dataset.delSection].splice(+btn.dataset.delIndex, 1);
+      render();
+    };
+  });
+  document.querySelectorAll('[data-move-sec]').forEach(btn => {
+    btn.onclick = () => {
+      collectFromDOM();
+      const arr = profile.sections[btn.dataset.moveSec];
+      const idx = +btn.dataset.moveIdx;
+      const newIdx = idx + (+btn.dataset.moveDir);
+      if(newIdx < 0 || newIdx >= arr.length) return;
+      [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+      render();
+    };
+  });
+  document.querySelectorAll('[data-move-link-idx]').forEach(btn => {
+    btn.onclick = () => {
+      collectFromDOM();
+      const idx = +btn.dataset.moveLinkIdx;
+      const newIdx = idx + (+btn.dataset.moveLinkDir);
+      if(newIdx < 0 || newIdx >= profile.links.length) return;
+      [profile.links[idx], profile.links[newIdx]] = [profile.links[newIdx], profile.links[idx]];
       render();
     };
   });
